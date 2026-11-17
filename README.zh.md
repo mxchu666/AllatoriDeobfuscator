@@ -72,6 +72,17 @@ java -cp build\libs\OpenAllatori-9.9.jar com.allatori.deobfuscate.Deobfuscate <�
 
 它会编译一个小型演示应用，先混淆再反混淆，并运行原始、混淆后、反混淆后的三个 JAR。经验证的结果：反混淆后的 JAR 打印出与原始版本**逐字节相同的输出**，产生**完全相同的堆栈跟踪**（`at com.example.demo.App.crash(App.java:31)`），并且 `javap -c` 能干净地反汇编每个类。
 
+## 可选：用 Recaf 做额外清理
+
+想要更干净的结果，可以对反混淆后的 JAR 执行一次可选的清理，使用 [Recaf 4.x](https://github.com/Col-E/Recaf) 及其 RecafMCP 插件：
+
+1. 启动加载了 RecafMCP 插件的 Recaf（桥接服务器在 `localhost:9847`）。
+2. 打开反混淆后的 JAR。
+3. 应用 `generic_all` 转换器预设，执行多遍（5 遍足够）。
+4. 导出 JAR。
+
+效果：删除字符串解密调用改写后遗留的 `nop` 对，把只返回常量的静态方法折叠成 `ldc` 常量，压缩死偏移等（`generic_all` 预设包含 23 个转换器）。已在演示往返中验证：运行输出和堆栈跟踪保持逐字节相同，`javap -c` 仍能干净地反汇编每个类。
+
 ---
 
 # 反混淆器的工作原理

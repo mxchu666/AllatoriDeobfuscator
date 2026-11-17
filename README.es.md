@@ -72,6 +72,17 @@ java -cp build\libs\OpenAllatori-9.9.jar com.allatori.deobfuscate.Deobfuscate <c
 
 Compila una mini app de demo, la ofusca, la desofusca y ejecuta los JAR original, ofuscado y desofuscado. Resultado verificado: el JAR desofuscado imprime **exactamente la misma salida** que el original y produce **stack traces idénticos** (`at com.example.demo.App.crash(App.java:31)`), y `javap -c` desensambla todas las clases limpiamente.
 
+## Opcional: limpieza extra con Recaf
+
+Para un resultado aún más limpio, aplica una pasada opcional de limpieza sobre el JAR desofuscado con [Recaf 4.x](https://github.com/Col-E/Recaf) y su plugin RecafMCP:
+
+1. Arranca Recaf con el plugin RecafMCP cargado (servidor puente en `localhost:9847`).
+2. Abre el JAR desofuscado.
+3. Aplica el preset de transformadores `generic_all` con varias pasadas (5 es suficiente).
+4. Exporta el JAR.
+
+Lo que hace aquí: elimina los pares `nop` que deja la reescritura de llamadas del descifrado de cadenas, plega los métodos estáticos que solo devuelven una constante en instrucciones `ldc`, compacta los offsets muertos y más (23 transformadores en el preset `generic_all`). Verificado con el demo de ida y vuelta: la salida y los stack traces siguen siendo idénticos byte a byte y `javap -c` desensambla todas las clases limpiamente.
+
 ---
 
 # Cómo funciona el desofuscador

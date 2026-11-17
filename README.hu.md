@@ -72,6 +72,17 @@ java -cp build\libs\OpenAllatori-9.9.jar com.allatori.deobfuscate.Deobfuscate <p
 
 Lefordít egy kis demóalkalmazást, obfuszkálja, deobfuszkálja, majd futtatja az eredeti, az obfuszkált és a deobfuszkált JAR-t. Ellenőrzött eredmény: a deobfuszkált JAR **bájról bájtra ugyanazt a kimenetet** írja, mint az eredeti, **azonos stack trace-t** ad (`at com.example.demo.App.crash(App.java:31)`), és a `javap -c` minden osztályt tisztán szétszed.
 
+## Opcionális: extra tisztítás Recaf-fal
+
+Még tisztább eredményért futtasson egy opcionális tisztítási menetet a deobfuszkált JAR-on [Recaf 4.x](https://github.com/Col-E/Recaf) és a RecafMCP plugin használatával:
+
+1. Indítsa el a Recaf-ot a betöltött RecafMCP pluginnal (hídszerver a `localhost:9847`-en).
+2. Nyissa meg a deobfuszkált JAR-t.
+3. Alkalmazza a `generic_all` transzformer-preszetet több menetben (5 elég).
+4. Exportálja a JAR-t.
+
+Mit tesz itt: eltávolítja a karakterlánc-visszafejtés hívás-átírásából maradt `nop` párokat, a csak konstanst visszaadó statikus metódusokat `ldc` konstansokká hajtja össze, tömöríti a halott eltolásokat stb. (23 transzformer a `generic_all` presetben). A demó oda-vissza tesztben ellenőrizve: a kimenet és a stack trace-ek bájról bájtra azonosak maradnak, és a `javap -c` továbbra is tisztán szétszed minden osztályt.
+
 ---
 
 # Hogyan működik a deobfuscator

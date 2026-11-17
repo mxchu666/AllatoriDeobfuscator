@@ -79,6 +79,17 @@ java -cp build\libs\OpenAllatori-9.9.jar com.allatori.deobfuscate.Deobfuscate <c
 
 This compiles a tiny demo app, obfuscates it, deobfuscates it, and runs the original, obfuscated and deobfuscated JARs. Verified result: the deobfuscated JAR prints **byte-for-byte the same output** as the original and produces **identical stack traces** (`at com.example.demo.App.crash(App.java:31)`), and `javap -c` disassembles every class cleanly.
 
+## Optional: extra cleanup with Recaf
+
+For an even cleaner result, run an optional post-cleanup pass on the deobfuscated JAR with [Recaf 4.x](https://github.com/Col-E/Recaf) and its RecafMCP plugin:
+
+1. Start Recaf with the RecafMCP plugin loaded (bridge server on `localhost:9847`).
+2. Open the deobfuscated JAR.
+3. Apply the `generic_all` transformer preset, several passes (5 is enough).
+4. Export the JAR.
+
+What it does here: removes the leftover `nop` pairs left by the string-decryption call rewriting, folds static methods that just return a constant into `ldc` constants, compacts dead offsets, and more (23 transformers in the `generic_all` preset). Verified on the demo round trip: runtime output and stack traces stay byte-for-byte identical, and `javap -c` still disassembles every class cleanly.
+
 ---
 
 # How the deobfuscator works
