@@ -1,0 +1,146 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'idea'
+    id 'eclipse'
+}
+group = 'com.allatori'
+version = '9.9'
+repositories { mavenCentral() }
+java {
+    // Compiles with whatever JDK runs Gradle (JDK 17+); output targets Java 17.
+    // Toolchain pinning was removed so the build works with any installed JDK.
+    withSourcesJar()
+}
+application {
+    mainClass = 'com.allatori.Obfuscate'
+    applicationDefaultJvmArgs = ['--add-opens=java.base/java.util.zip=ALL-UNNAMED']
+}
+sourceSets {
+    wtkApi { java.srcDir 'src/wtkApi/java' }
+    main { compileClasspath += sourceSets.wtkApi.output }
+}
+dependencies {
+    compileOnly 'org.apache.ant:ant:1.10.15'
+    compileOnly('org.eclipse.platform:org.eclipse.equinox.registry:3.11.200') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.core.resources:3.18.100') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.core.runtime:3.26.100') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.equinox.common:3.17.0') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.core.jobs:3.13.200') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.core.commands:3.10.300') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.core.expressions:3.8.200') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.jface:3.28.0') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.ui.workbench:3.127.0') { transitive = false }
+    compileOnly('org.eclipse.platform:org.eclipse.osgi:3.18.200') { transitive = false }
+    compileOnly('org.eclipse.jdt:org.eclipse.jdt.core:3.32.0') { transitive = false }
+}
+tasks.named('compileJava') { dependsOn tasks.named('wtkApiClasses') }
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters', '-Xmaxerrs', '2000']
+}
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+jar {
+    manifest {
+        from('src/main/resources/META-INF/MANIFEST.MF')
+        attributes('Main-Class': 'com.allatori.Obfuscate', 'Bundle-RequiredExecutionEnvironment': 'JavaSE-17', 'Add-Opens': 'java.base/java.util.zip')
+    }
+}
+processResources { exclude 'META-INF/MANIFEST.MF' }
+tasks.register('resolveCompileApis') { doLast { configurations.compileClasspath.files.each { println it.name } } }
+
+// ---------------------------------------------------------------------------
+// Demo: compile a tiny app, obfuscate it with OpenAllatori and run both JARs.
+//   .\gradlew.bat runDemo
+// ---------------------------------------------------------------------------
+def demoBuild = layout.projectDirectory.dir('demo/build')
+
+def demoCompile = tasks.register('demoClasses', JavaCompile) {
+    source = fileTree(layout.projectDirectory.dir('demo/src'))
+    destinationDirectory = demoBuild.dir('classes')
+    classpath = files()
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+tasks.register('demoJar', Jar) {
+    dependsOn demoCompile
+    archiveFileName = 'demo.jar'
+    destinationDirectory = demoBuild
+    from demoBuild.dir('classes')
+    manifest { attributes('Main-Class': 'com.example.demo.App') }
+}
+
+tasks.register('runDemoObfuscate', JavaExec) {
+    dependsOn demoJar, jar
+    group = 'demo'
+    description = 'Obfuscates the demo JAR using demo/allatori-demo.xml.'
+    doFirst { layout.projectDirectory.dir('demo/out').asFile.mkdirs() }
+    mainClass = 'com.allatori.Obfuscate'
+    classpath = sourceSets.main.runtimeClasspath
+    jvmArgs '--add-opens=java.base/java.util.zip=ALL-UNNAMED'
+    args 'demo/allatori-demo.xml'
+}
+
+tasks.register('runDemoOriginal', JavaExec) {
+    dependsOn demoJar
+    group = 'demo'
+    description = 'Runs the original (unobfuscated) demo JAR.'
+    mainClass = 'com.example.demo.App'
+    classpath = files(demoJar.archiveFile)
+    jvmArgs '--add-opens=java.base/java.util.zip=ALL-UNNAMED'
+    args = ['a', 'b']
+}
+
+tasks.register('runDemoObfuscated', JavaExec) {
+    dependsOn 'runDemoObfuscate'
+    group = 'demo'
+    description = 'Runs the obfuscated demo JAR.'
+    mainClass = 'com.example.demo.App'
+    classpath = files(layout.projectDirectory.file('demo/out/demo-obfuscated.jar'))
+    jvmArgs '--add-opens=java.base/java.util.zip=ALL-UNNAMED'
+    args = ['a', 'b']
+}
+
+tasks.register('runDemo') {
+    group = 'demo'
+    description = 'Runs both the original and the obfuscated demo JARs.'
+    dependsOn 'runDemoOriginal', 'runDemoObfuscated'
+}
+
+// ---------------------------------------------------------------------------
+// Demo deobfuscation: invert the obfuscation of demo/out/demo-obfuscated.jar
+// using the mapping written by the obfuscator.
+//   .\gradlew.bat runDemoDeobfuscated   (or runDemoRoundTrip for all three)
+// ---------------------------------------------------------------------------
+tasks.register('runDemoDeobfuscate', JavaExec) {
+    dependsOn 'runDemoObfuscate'
+    group = 'demo'
+    description = 'Restores the demo JAR: decrypts strings, drops the decryptor and renames everything back.'
+    doFirst { layout.projectDirectory.dir('demo/out').asFile.mkdirs() }
+    mainClass = 'com.allatori.deobfuscate.Deobfuscate'
+    classpath = sourceSets.main.runtimeClasspath
+    jvmArgs '--add-opens=java.base/java.util.zip=ALL-UNNAMED'
+    args = ['full', 'demo/out/mapping.xml', 'demo/out/demo-obfuscated.jar', 'demo/out/demo-deobfuscated.jar', '--remove-decryptor']
+}
+
+tasks.register('runDemoDeobfuscated', JavaExec) {
+    dependsOn 'runDemoDeobfuscate'
+    group = 'demo'
+    description = 'Runs the deobfuscated demo JAR; output must match runDemoOriginal.'
+    mainClass = 'com.example.demo.App'
+    classpath = files(layout.projectDirectory.file('demo/out/demo-deobfuscated.jar'))
+    jvmArgs '--add-opens=java.base/java.util.zip=ALL-UNNAMED'
+    args = ['a', 'b']
+}
+
+tasks.register('runDemoRoundTrip') {
+    group = 'demo'
+    description = 'Runs the original, the obfuscated and the deobfuscated demo JARs.'
+    dependsOn 'runDemoOriginal', 'runDemoObfuscated', 'runDemoDeobfuscated'
+}
+

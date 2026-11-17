@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Demo configuration for OpenAllatori.
+  Run from the OpenAllatori-main folder:
+      .\gradlew.bat runDemo
+-->
+
+<config>
+
+  <input basedir="build">
+    <jar in="demo.jar" out="../out/demo-obfuscated.jar"/>
+  </input>
+
+  <keep-names>
+    <class access="public+" template="class com.example.demo.App"/>
+    <method access="public+protected" template="static void main(java.lang.String[])"/>
+  </keep-names>
+
+  <ignore-classes>
+    <class template="class com.example.demo.util.Names"/>
+  </ignore-classes>
+
+  <property name="log-file" value="out/mapping.xml"/>
+  <property name="random-seed" value="openallatori-demo"/>
+
+  <property name="string-encryption" value="enable"/>
+  <property name="string-encryption-seed" value="K"/>
+  <property name="string-encryption-version" value="v3"/>
+
+  <property name="line-numbers" value="keep"/>
+
+</config>
